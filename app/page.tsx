@@ -1,53 +1,79 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 export default function Home() {
   const isDead = false; // Change this to true when needed
   const audioRef = useRef<HTMLAudioElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
 
   useEffect(() => {
-    // Auto-play music when component mounts
-    const playAudio = async () => {
-      if (audioRef.current) {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    // Set up audio
+    audio.volume = 0.7;
+    audio.loop = true;
+
+    // Try to play on load
+    const tryPlay = async () => {
+      try {
+        await audio.play();
+        setIsPlaying(true);
+      } catch (error) {
+        // Autoplay blocked - will need user interaction
+        console.log('Autoplay blocked, waiting for user interaction');
+      }
+    };
+
+    // Try when audio is ready
+    audio.addEventListener('canplaythrough', tryPlay);
+    audio.load();
+
+    // Play on any user interaction
+    const handleInteraction = async () => {
+      if (!isPlaying && audio) {
         try {
-          audioRef.current.volume = 0.7;
-          await audioRef.current.play();
+          await audio.play();
+          setIsPlaying(true);
         } catch (error) {
-          // Autoplay might be blocked - user interaction required
-          console.log('Autoplay prevented, user interaction needed');
+          console.error('Error playing audio:', error);
         }
       }
     };
-    
-    // Try to play on mount
-    playAudio();
-    
-    // Also try on first user interaction
-    const handleInteraction = () => {
-      playAudio();
-      document.removeEventListener('click', handleInteraction);
-      document.removeEventListener('touchstart', handleInteraction);
-    };
-    
-    document.addEventListener('click', handleInteraction);
-    document.addEventListener('touchstart', handleInteraction);
-    
+
+    // Add listeners for user interaction
+    window.addEventListener('click', handleInteraction, { once: true });
+    window.addEventListener('touchstart', handleInteraction, { once: true });
+    window.addEventListener('keydown', handleInteraction, { once: true });
+
     return () => {
-      document.removeEventListener('click', handleInteraction);
-      document.removeEventListener('touchstart', handleInteraction);
+      if (audio) {
+        audio.removeEventListener('canplaythrough', tryPlay);
+      }
+      window.removeEventListener('click', handleInteraction);
+      window.removeEventListener('touchstart', handleInteraction);
+      window.removeEventListener('keydown', handleInteraction);
     };
-  }, []);
+  }, [isPlaying]);
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden">
+    <main 
+      className="min-h-screen flex items-center justify-center bg-black text-white relative overflow-hidden cursor-pointer"
+      onClick={() => {
+        if (audioRef.current && !isPlaying) {
+          audioRef.current.play().then(() => setIsPlaying(true)).catch(console.error);
+        }
+      }}
+    >
       {/* Audio player - hidden */}
       <audio 
         ref={audioRef} 
         src="/music.mp3" 
         loop 
-        autoPlay
+        preload="auto"
         className="hidden"
+        crossOrigin="anonymous"
       />
       
       {/* Christian cross in background */}
